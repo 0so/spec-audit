@@ -116,6 +116,30 @@ async function handleFiles(fileList) {
 </html>"""
 
 
+def _relativize_paths(report_dict: dict, tmp_dir: str) -> None:
+    """Cosmetic only: strip the server's temp-directory prefix from
+    reported file paths so the browser shows the dropped folder's own
+    relative layout instead of an absolute machine-specific path."""
+    prefix = str(Path(tmp_dir)) + "\\" if "\\" in str(Path(tmp_dir)) else str(Path(tmp_dir)) + "/"
+    prefix_alt = str(Path(tmp_dir).as_posix()) + "/"
+
+    def strip(p: str) -> str:
+        for pre in (prefix, prefix_alt):
+            if p.startswith(pre):
+                return p[len(pre):]
+        return p
+
+    for v in report_dict.get("violations", []):
+        v["file"] = strip(v["file"])
+        v["message"] = v["message"].replace(str(tmp_dir) + "\\", "").replace(str(tmp_dir) + "/", "")
+        if v.get("heuristic_source"):
+            v["heuristic_source"] = v["heuristic_source"].replace(str(tmp_dir) + "\\", "").replace(
+                str(tmp_dir) + "/", ""
+            )
+        for c in v.get("conflict", []) or []:
+            c["file"] = strip(c["file"])
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # noqa: A002 -- quiet by default
         pass
@@ -162,7 +186,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 dest.write_text(content, encoding="utf-8")
 
             report = run(Path(tmp_dir))
-            html_fragment = _render_html(report.to_dict())
+            report_dict = report.to_dict()
+            _relativize_paths(report_dict, tmp_dir)
+            html_fragment = _render_html(report_dict)
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
