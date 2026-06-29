@@ -361,9 +361,19 @@ def _render_html(report_dict: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows redirects stdout through the console codepage (e.g. cp1252)
+    # instead of UTF-8 by default, which mangles the accented Spanish
+    # text in risk/action fields when output is piped to a file. Force
+    # UTF-8 explicitly rather than relying on PYTHONUTF8 being set.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
     argv = argv if argv is not None else sys.argv[1:]
 
     fmt = "json"
+    serve_mode = False
+    port = 8765
     positional: list[str] = []
     i = 0
     while i < len(argv):
@@ -375,11 +385,28 @@ def main(argv: list[str] | None = None) -> int:
             fmt = argv[i + 1]
             i += 2
             continue
+        if arg == "--serve":
+            serve_mode = True
+            i += 1
+            continue
+        if arg == "--port":
+            if i + 1 >= len(argv):
+                print("usage: spec-audit --serve [--port N]", file=sys.stderr)
+                return 2
+            port = int(argv[i + 1])
+            i += 2
+            continue
         positional.append(arg)
         i += 1
 
+    if serve_mode:
+        from spec_audit.webui import serve
+
+        serve(port=port)
+        return 0
+
     if len(positional) != 1 or fmt not in ("json", "html"):
-        print("usage: spec-audit <repo_path> [--format json|html]", file=sys.stderr)
+        print("usage: spec-audit <repo_path> [--format json|html]  |  spec-audit --serve [--port N]", file=sys.stderr)
         return 2
 
     repo_path = Path(positional[0])
