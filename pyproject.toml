@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spec-audit"
+version = "0.1.0"
+description = "CI static analyzer that detects ambiguous single-source-of-truth for parameters in research/quant codebases."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+spec-audit = "spec_audit.cli:main"
+
+[tool.setuptools]
+packages = ["spec_audit"]
